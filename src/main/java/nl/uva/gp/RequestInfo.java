@@ -1,4 +1,4 @@
-package nl.uva.cs;
+package nl.uva.gp;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;

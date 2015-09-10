@@ -4,7 +4,7 @@
  * and open the template in the editor.
  */
 
-package nl.uva.cs;
+package nl.uva.gp;
 
 import java.util.HashSet;
 import java.util.Objects;

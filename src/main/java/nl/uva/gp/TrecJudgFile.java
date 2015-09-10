@@ -4,7 +4,7 @@
  * and open the template in the editor.
  */
 
-package nl.uva.cs;
+package nl.uva.gp;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;

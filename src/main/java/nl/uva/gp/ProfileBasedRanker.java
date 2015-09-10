@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package nl.uva.cs;
+package nl.uva.gp;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -52,16 +52,9 @@ public class ProfileBasedRanker {
         iInfo = new IndexInfo(ireader);
     }
 
-    public void main() throws FileNotFoundException, IOException {
-        File f2 = new File("response-treceval.res");
-            f2.delete();
+    public void ranker() throws FileNotFoundException, IOException {
         String field = "TEXT";
-        indexPathString = configFile.getProperty("INDEX_PATH");
-        ipath = FileSystems.getDefault().getPath(indexPathString);
-        ireader = DirectoryReader.open(FSDirectory.open(ipath));
-        iInfo = new IndexInfo(ireader);
         CollectionSLM CLM = new CollectionSLM(ireader, field);
-
         String inputProfiles = configFile.getProperty("REQS");
         String line = null;
         BufferedReader br = new BufferedReader(new FileReader(inputProfiles));
@@ -107,7 +100,7 @@ public class ProfileBasedRanker {
         File f = new File("ProfileBased.res");
             f.delete();
         ProfileBasedRanker r = new ProfileBasedRanker();
-        r.main();
+        r.ranker();
         System.out.println("Finished...");
     }
 

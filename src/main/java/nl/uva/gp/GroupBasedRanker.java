@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package nl.uva.cs;
+package nl.uva.gp;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -15,11 +15,13 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import nl.uva.generalinzedlm.DocsGroup;
 import nl.uva.lm.CollectionSLM;
 import nl.uva.lm.Divergence;
 import nl.uva.lm.LanguageModel;
@@ -43,25 +45,27 @@ public class GroupBasedRanker {
     private Path ipath;
     private IndexReader ireader;
     private IndexInfo iInfo;
+    private String RindexPathString;
+    private Path Ripath;
+    private IndexReader Rireader;
+    private IndexInfo RiInfo;
     private HashMap<Entry<String,String>, Entry<Double,HashSet<String>>> rates;
+    public String group = "SEASON";
 
     public GroupBasedRanker() throws IOException {
         indexPathString = configFile.getProperty("INDEX_PATH");
         ipath = FileSystems.getDefault().getPath(indexPathString);
         ireader = DirectoryReader.open(FSDirectory.open(ipath));
         iInfo = new IndexInfo(ireader);
+        RindexPathString = configFile.getProperty("RINDEX_PATH");
+        Ripath = FileSystems.getDefault().getPath(RindexPathString);
+        Rireader = DirectoryReader.open(FSDirectory.open(Ripath));
+        RiInfo = new IndexInfo(Rireader);
     }
 
-    public void main() throws FileNotFoundException, IOException {
-        File f2 = new File("response-treceval.res");
-            f2.delete();
+    public void ranker() throws FileNotFoundException, IOException {
         String field = "TEXT";
-        indexPathString = configFile.getProperty("INDEX_PATH");
-        ipath = FileSystems.getDefault().getPath(indexPathString);
-        ireader = DirectoryReader.open(FSDirectory.open(ipath));
-        iInfo = new IndexInfo(ireader);
         CollectionSLM CLM = new CollectionSLM(ireader, field);
-
         String inputProfiles = configFile.getProperty("REQS");
         String line = null;
         BufferedReader br = new BufferedReader(new FileReader(inputProfiles));
@@ -70,14 +74,23 @@ public class GroupBasedRanker {
         while ((line = br.readLine()) != null) {
             reqInfo.setJson(line);
             Request r = reqInfo.GetRequest();
+            Integer RIndexId = RiInfo.getIndexId(r.reqId);
+            String rGroup = Rireader.document(RIndexId).get(this.group);
+            if(rGroup.equalsIgnoreCase("unknown")){
+                System.err.println("Unknown group for:" + this.group + " for request:" + r.reqId);
+            }
+            ArrayList<Integer> docsList = RiInfo.getDocsContainingTerm(this.group, rGroup);
+            System.out.println("Number of doc in group" + this.group + ":" + rGroup + " is:" + docsList.size());
+            DocsGroup dGroup = new DocsGroup(Rireader, "TEXT", docsList);
             HashMap<String, Double> scores = new HashMap<>();
+            
             for (RatedDoc candidate : r.ratedCandidates) {
                 Integer indexId = iInfo.getIndexId(candidate.docID);
                 LanguageModel candidateSLM = new StandardLM(ireader, indexId, field);
                 SmoothedLM candidateSLM_smoothed = new SmoothedLM(candidateSLM, CLM);
-                SmoothedLM PMLM_smoothed = new SmoothedLM(r.getUserPrefPositiveMixtureLM(), CLM);
+                SmoothedLM groupLM_smoothed = new SmoothedLM(dGroup.getGroupGeneralizedLM(), CLM);
                 
-                Divergence div = new Divergence(candidateSLM_smoothed, PMLM_smoothed);
+                Divergence div = new Divergence(candidateSLM_smoothed, groupLM_smoothed);
                 Double score = div.getJsdSimScore();
                 scores.put(candidate.docID,score);
             }
@@ -91,10 +104,10 @@ public class GroupBasedRanker {
     
     private void OutputGenerator_trecEval(String pId, List<Map.Entry<String, Double>> sortedCandidates) throws IOException{
         //query-number    Q0  document-id rank    score   Exp
-        PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter("ProfileBased.res", true)));
+        PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter("GroupBased_" + this.group + ".res", true)));
         Integer rank = 1;
         for(Map.Entry<String, Double> e : sortedCandidates){
-                String line = pId + " Q0 " + e.getKey() + " " + rank + " " + e.getValue() + " ProfileBased";
+                String line = pId + " Q0 " + e.getKey() + " " + rank + " " + e.getValue() + " GruppBased_" + this.group;
                 out.println(line);
                 rank++;
         }
@@ -104,10 +117,11 @@ public class GroupBasedRanker {
      
 
     public static void main(String[] args) throws IOException {
-        File f = new File("ProfileBased.res");
-            f.delete();
+       
         GroupBasedRanker r = new GroupBasedRanker();
-        r.main();
+        File f = new File("GroupBased_" + r.group + ".res");
+            f.delete();
+        r.ranker();
         System.out.println("Finished...");
     }
 
